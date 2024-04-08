@@ -6,7 +6,7 @@ import (
 )
 
 func TestFlockMutex_Exclusive(t *testing.T) {
-	f, err := NewFlock("test")
+	f, err := NewFlock("test/a")
 	require.NoError(t, err)
 
 	err = f.ShareLock(true)
@@ -22,7 +22,7 @@ func TestFlockMutex_Exclusive(t *testing.T) {
 	require.NoError(t, err)
 
 	// use the same resource
-	f2, err := NewFlock("test")
+	f2, err := NewFlock("test/a")
 	require.NoError(t, err)
 
 	err = f2.ExclusiveLock(true)
@@ -33,7 +33,7 @@ func TestFlockMutex_Exclusive(t *testing.T) {
 }
 
 func TestFlockMutex_Lock(t *testing.T) {
-	f, err := NewFlock("test")
+	f, err := NewFlock("test/b")
 	require.NoError(t, err)
 	fm := f.FlockMutex()
 	fm.RLock()

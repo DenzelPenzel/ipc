@@ -34,14 +34,39 @@ const (
 	SHM_HUGETLB   = 04000  // segment is mapped via hugetlb
 	SHM_NORESERVE = 010000 // don't check for reservations
 
-	IPC_RMID = 0 // remove command
+	/* Mode bits for `msgget', `semget', and `shmget'.  */
+	IPC_CREAT  = 01000 // create key if key does not exist.
+	IPC_EXCL   = 02000 // fail if key exists.
+	IPC_NOWAIT = 04000 // return error on wait.
+
+	/* Permission flag for `msgget', `semget', and `shmget'.  */
+	IPC_R  = 0400 // read
+	IPC_W  = 0200 // write
+	IPC_RW = 0600 // read and write
+
+	/* Control commands for `msgctl', `semctl', and `shmctl'.  */
+	IPC_RMID = 0 // remove identifier.
+	IPC_SET  = 1 // set `ipc_perm' options.
+	IPC_STAT = 2 // get `ipc_perm' options.
+	IPC_INFO = 3 // see ipcs.
+
+	/* Special key values.  */
+	IPC_PRIVATE = 0 // private key. NOTE: this value is of type __key_t.
 )
 
-type shminfo struct {
+type ShmInfo struct {
 	sync.RWMutex
 	id2Size   map[int]uint64            // {id -> size}
 	addr2Size map[unsafe.Pointer]uint64 // {addr -> size}
 	addr2Id   map[unsafe.Pointer]int    // { addr -> id }
+}
+
+func NewShm() *ShmInfo {
+	return &ShmInfo{
+		id2Size:   make(map[int]uint64, 64),
+		addr2Size: make(map[unsafe.Pointer]uint64, 64),
+		addr2Id:   make(map[unsafe.Pointer]int, 64),
+	}
 }
 
 // Shmget ... Get a shared memory identifier or create a shared memory object
@@ -59,7 +84,7 @@ type shminfo struct {
 // The shmflg parameter above represents a mode flag used in shared memory operations.
 // When utilized, it should be computed alongside the IPC object access permissions (e.g., 0600)
 // to ascertain the access permissions for the shared memory segment
-func (s *shminfo) Shmget(key, size uint64, shmflg int) (int, error) {
+func (s *ShmInfo) Shmget(key, size uint64, shmflg int) (int, error) {
 	_sid, _, err := syscall.Syscall(syscall.SYS_SHMGET, uintptr(key), uintptr(size), uintptr(shmflg))
 	if err != 0 {
 		return 0, err
@@ -76,7 +101,7 @@ func (s *shminfo) Shmget(key, size uint64, shmflg int) (int, error) {
 // However, after an exec, the child process is automatically detached from the connected shared memory address.
 // Furthermore, when the process terminates, the connected shared memory address
 // will be automatically detached (or 'detached')
-func (s *shminfo) Shmat(id int, shmflg int) (unsafe.Pointer, error) {
+func (s *ShmInfo) Shmat(id int, shmflg int) (unsafe.Pointer, error) {
 	_addr, _, err := syscall.Syscall(syscall.SYS_SHMAT, uintptr(id), 0, uintptr(shmflg))
 	if err != 0 {
 		return nil, err
@@ -95,7 +120,7 @@ func (s *shminfo) Shmat(id int, shmflg int) (unsafe.Pointer, error) {
 
 // Shmdt ... Detach the address of the attachment point from the shared memory,
 // effectively preventing the process from accessing this shared memory thereafter
-func (s *shminfo) Shmdt(addr unsafe.Pointer) error {
+func (s *ShmInfo) Shmdt(addr unsafe.Pointer) error {
 	_, _, err := syscall.Syscall(syscall.SYS_SHMDT, uintptr(addr), 0, 0)
 	if err != 0 {
 		return err
@@ -114,7 +139,7 @@ func (s *shminfo) Shmdt(addr unsafe.Pointer) error {
 // IPC_SET: Change the status of the shared memory and copy the uid, gid, and mode in the shmid_ds structure pointed to by buf to the shmid_ds structure of the shared memory.
 // IPC_RMID: Delete this shared memory
 // buf: Shared memory management structure. For specific instructions, please refer to the shared memory kernel structure definition section.
-func (s *shminfo) Shmctl(smid, cmd int) error {
+func (s *ShmInfo) Shmctl(smid, cmd int) error {
 	var buf uintptr = 0
 	_, _, err := syscall.Syscall(syscall.SYS_SHMCTL, uintptr(smid), uintptr(cmd), buf)
 	if err != 0 || cmd != IPC_RMID {
@@ -133,8 +158,8 @@ func (s *shminfo) Shmctl(smid, cmd int) error {
 	return nil
 }
 
-// ShRead ... Read data from the shared memory
-func (s *shminfo) ShRead(addr unsafe.Pointer) []byte {
+// Shmread ... Read data from the shared memory
+func (s *ShmInfo) Shmread(addr unsafe.Pointer) []byte {
 	ptr := (*[4]byte)(addr)
 	if ptr == nil {
 		return nil
@@ -154,8 +179,8 @@ func (s *shminfo) ShRead(addr unsafe.Pointer) []byte {
 	return buf
 }
 
-// ShWrite ... Write data to the shared memory
-func (s *shminfo) ShWrite(addr unsafe.Pointer, data []byte) error {
+// Shmwrite ... Write data to the shared memory
+func (s *ShmInfo) Shmwrite(addr unsafe.Pointer, data []byte) error {
 	size := 4 + len(data)
 	s.RLock()
 	maxSize := s.addr2Size[addr]

@@ -57,7 +57,7 @@ func (f *Flock) UnlockAll() error {
 	return syscall.Flock(int(f.file.Fd()), syscall.LOCK_UN)
 }
 
-func (f *Flock) FlockMutex() IPСLock {
+func (f *Flock) FlockMutex() Lock {
 	return &FlockMutex{file: f, local: sync.RWMutex{}}
 }
 
