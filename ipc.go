@@ -1,7 +1,6 @@
 package ipc
 
 import (
-	"github.com/denzelpenzel/ipc/semlock"
 	"sync"
 	"syscall"
 )
@@ -46,7 +45,7 @@ func NewLock(path string, mode LockType, ftokIds ...uint64) (Lock, error) {
 		if err != nil {
 			return nil, err
 		}
-		return semlock.NewSemLock(key)
+		return NewSemLock(key)
 	}
 	return nil, nil
 }

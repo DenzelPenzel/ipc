@@ -1,5 +1,4 @@
-// Package semlock using process semaphores to implement read-write locks
-package semlock
+package ipc
 
 import (
 	"errors"
@@ -11,6 +10,8 @@ import (
 	"unsafe"
 )
 
+// semlock using process semaphores to implement read-write locks
+
 const (
 	/* ipcs ctl cmds */
 	SEM_STAT     = 18
@@ -18,16 +19,8 @@ const (
 	SEM_STAT_ANY = 20
 	SEM_UNDO     = 0x1000 // undo the operation on exit
 
-	// IPC_RMID removes identifier
-	IPC_RMID = 0
-	// IPC_SET sets ipc_perm options.
-	IPC_SET = 1
-	// IPC_STAT gets ipc_perm options.
-	IPC_STAT = 2
-
 	/* Commands for `semctl'.  */
 	GETPID  = 11 /* get sempid */
-	GETVAL  = 12 /* get semval */
 	GETALL  = 13 /* get all semval's */
 	GETNCNT = 14 /* get semncnt */
 	GETZCNT = 15 /* get semzcnt */
@@ -80,7 +73,7 @@ type SemOp struct {
 	SemFlag int16
 }
 
-// Semget ... Get a semaphore set identifier or create a semaphore set object and return the semaphore set identifier
+// Semget ... GetMsg a semaphore set identifier or create a semaphore set object and return the semaphore set identifier
 // key:
 //   - 0(IPC_PRIVATE): A new semaphore set object will be created
 //   - A 32-bit integer greater than 0: The operation is determined by the parameter semflag.
@@ -90,7 +83,7 @@ type SemOp struct {
 // - number of semaphores in the created semaphore set. This parameter is only valid when creating a semaphore set.
 //
 // semflag:
-// - 0: Get the semaphore set identifier. If it does not exist, the function will report an error.
+// - 0: GetMsg the semaphore set identifier. If it does not exist, the function will report an error.
 //
 //   - IPC_CREAT: When semflag & IPC_CREAT is true, if there is no semaphore set with a key value equal to key in the kernel,
 //     a new semaphore set will be created; if such a semaphore set exists, the identifier of this semaphore set will be returned.
@@ -156,7 +149,14 @@ type SemLock struct {
 }
 
 func NewSemLock(id uint64) (*SemLock, error) {
-	return &SemLock{}, nil
+	semid, err := Semget(id, 2, IPC_CREAT|IPC_EXCL|1023)
+	if errors.Is(err, syscall.EEXIST) {
+		semid, err = Semget(id, 2, 0)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &SemLock{id: semid}, nil
 }
 
 func (s *SemLock) Lock() {

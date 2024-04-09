@@ -69,7 +69,7 @@ func NewShm() *ShmInfo {
 	}
 }
 
-// Shmget ... Get a shared memory identifier or create a shared memory object
+// Shmget ... GetMsg a shared memory identifier or create a shared memory object
 // key: A 32-bit integer greater than 0: The operation is governed by the parameter shmflg,
 // typically derived from the IPC key value returned by Ftok
 // size: An integer greater than 0: representing the size of the new shared memory, measured in bytes
